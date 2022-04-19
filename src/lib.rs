@@ -1,3 +1,6 @@
+pub mod error;
+
+use crate::error::ElasticError;
 use dotenv::dotenv;
 use elastic_parser::{Hit, SearchResponse};
 use elastic_query_builder::QueryBuilder;
@@ -19,14 +22,14 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 
-pub fn el_client() -> Result<Elasticsearch, String> {
+pub fn el_client() -> Result<Elasticsearch, ElasticError> {
     dotenv().ok();
     let host = env::var("ELASTIC_HOST").unwrap_or("http://localhost:9200".to_string());
     let transport = Transport::single_node(host.as_str());
 
     return match transport {
         Ok(v) => Ok(Elasticsearch::new(v)),
-        Err(_) => Err("Error Elastic Connection ".to_string()),
+        Err(e) => Err(ElasticError::Connection(e.to_string())),
     };
 }
 
@@ -51,7 +54,7 @@ pub async fn exist_index(index: &str) -> bool {
     };
 }
 
-pub async fn create_index<T>(index: &str, json: T) -> Result<bool, String>
+pub async fn create_index<T>(index: &str, json: T) -> Result<bool, ElasticError>
 where
     T: Serialize,
 {
@@ -63,11 +66,11 @@ where
         .await
     {
         Ok(v) => Ok(v.status_code() == 200),
-        Err(e) => Err(e.to_string()),
+        Err(e) => Err(ElasticError::Send(e.to_string())),
     };
 }
 
-pub async fn recreate_index<T>(index: &str, json: T) -> Result<bool, String>
+pub async fn recreate_index<T>(index: &str, json: T) -> Result<bool, ElasticError>
 where
     T: Serialize,
 {
@@ -79,60 +82,121 @@ where
             .send()
             .await;
         if res.is_err() {
-            return Err(res.err().unwrap().to_string());
+            return Err(ElasticError::Response(res.err().unwrap().to_string()));
         }
     }
     let result = create_index(index, json).await?;
     Ok(result)
 }
 
-pub async fn update<T: serde::Serialize>(index: &str, id: &str, source: T) -> Result<(), String> {
-    let client = el_client();
-    if client.is_err() {
-        return Err(client.err().unwrap());
-    }
-    let _ = client
-        .unwrap()
+pub async fn update<T: serde::Serialize>(
+    index: &str,
+    id: &str,
+    source: T,
+) -> Result<bool, ElasticError> {
+    let client = el_client()?;
+    let res = client
         .update(UpdateParts::IndexId(index, id))
         .body(json!({ "doc": source }))
         .send()
         .await;
+    if res.is_err() {
+        return Err(ElasticError::Response(res.unwrap_err().to_string()));
+    }
+    let code = res.as_ref().unwrap().status_code();
+    if code == 404 {
+        return Err(ElasticError::NotFound(format!("not found entity: {}", id)));
+    }
+    return Ok(code == 200);
+}
+pub async fn update_or_create<T: serde::Serialize>(
+    index: &str,
+    id: &str,
+    source: &T,
+) -> Result<bool, ElasticError> {
+    let res = update(index, id, source).await;
+    if res.is_err() {
+        let error = res.unwrap_err();
+        match error {
+            ElasticError::NotFound(_) => {}
+            _ => {
+                return Err(error);
+            }
+        };
+    } else {
+        let res = res.unwrap();
+        if res {
+            return Ok(true);
+        }
+    }
+    let res = insert_by_id(index, id, source).await;
+    if res.is_err() {
+        return Err(res.unwrap_err());
+    }
+    let res = res.unwrap();
+    return Ok(res.status_code() == 200);
+}
 
-    return Ok(());
+pub async fn insert_by_id<T: serde::Serialize>(
+    index: &str,
+    id: &str,
+    source: T,
+) -> Result<Response, ElasticError> {
+    let mut body: Vec<JsonBody<_>> = Vec::with_capacity(4);
+    body.push(json!({"index": {"_id":id}}).into());
+    body.push(json!(source).into());
+    let client = el_client()?;
+    let res = client.bulk(BulkParts::Index(index)).body(body).send().await;
+    if res.is_err() {
+        return Err(ElasticError::Response(res.err().unwrap().to_string()));
+    }
+    return Ok(res.unwrap());
 }
 
 pub async fn bulk_insert<T: serde::Serialize>(
     index: &str,
     sources: Vec<T>,
-) -> Result<Response, elasticsearch::Error> {
+) -> Result<Response, ElasticError> {
     let mut body: Vec<JsonBody<_>> = Vec::with_capacity(4);
     for source in sources {
         body.push(json!({"index": {}}).into());
         body.push(json!(source).into())
     }
-    let client = el_client().unwrap();
-    client.bulk(BulkParts::Index(index)).body(body).send().await
+    let client = el_client()?;
+    let res = client.bulk(BulkParts::Index(index)).body(body).send().await;
+    if res.is_err() {
+        return Err(ElasticError::Response(res.err().unwrap().to_string()));
+    }
+    return Ok(res.unwrap());
 }
 
-pub async fn delete(index: &str, id: &str) -> Result<Response, elasticsearch::Error> {
-    let client = el_client().unwrap();
-    client.delete(DeleteParts::IndexId(index, id)).send().await
+pub async fn delete(index: &str, id: &str) -> Result<Response, ElasticError> {
+    let client = el_client()?;
+    let res = client.delete(DeleteParts::IndexId(index, id)).send().await;
+    if res.is_err() {
+        return Err(ElasticError::Response(res.err().unwrap().to_string()));
+    }
+    return Ok(res.unwrap());
 }
 
-pub async fn refresh(index: &str) -> Result<Response, elasticsearch::Error> {
-    let client = el_client().unwrap();
-    client
+pub async fn refresh(index: &str) -> Result<Response, ElasticError> {
+    let client = el_client()?;
+    let res = client
         .index(IndexParts::Index(index))
         .refresh(Refresh::True)
         .body(json!({}))
         .send()
-        .await
+        .await;
+    if res.is_err() {
+        return Err(ElasticError::Response(res.err().unwrap().to_string()));
+    }
+    return Ok(res.unwrap());
 }
 
 pub async fn first_search<T>(
     index: &str,
     query_builder: QueryBuilder,
-) -> Result<Option<Hit<T>>, String>
+) -> Result<Option<Hit<T>>, ElasticError>
 where
     T: DeserializeOwned + 'static,
 {
@@ -140,8 +204,7 @@ where
     if client.is_err() {
         return Ok(None);
     }
-    let client = client.unwrap();
-    return match client
+    return match client?
         .search(SearchParts::Index(&[index]))
         .body(query_builder.build())
         .size(1)
@@ -162,7 +225,7 @@ where
                     Ok(Some(value.unwrap()))
                 }
                 Err(v) => {
-                    return Err(v.to_string());
+                    return Err(ElasticError::Response(v.to_string()));
                 }
             };
         }
@@ -170,16 +233,14 @@ where
     };
 }
 
-pub async fn scroll<T>(scroll_id: &str, alive: &str) -> Result<Option<SearchResponse<T>>, String>
+pub async fn scroll<T>(
+    scroll_id: &str,
+    alive: &str,
+) -> Result<Option<SearchResponse<T>>, ElasticError>
 where
     T: DeserializeOwned + 'static,
 {
-    let client = el_client();
-    if client.is_err() {
-        return Ok(None);
-    }
-    let client = client.unwrap();
-
+    let client = el_client()?;
     match client
         .scroll(ScrollParts::ScrollId(scroll_id))
         .scroll(alive)
@@ -190,7 +251,7 @@ where
             return match response.json::<SearchResponse<T>>().await {
                 Ok(v) => Ok(Some(v)),
                 Err(v) => {
-                    return Err(v.to_string());
+                    return Err(ElasticError::Response(v.to_string()));
                 }
             };
         }
@@ -201,15 +262,11 @@ where
 pub async fn search<T>(
     index: &str,
     query_builder: QueryBuilder,
-) -> Result<Option<SearchResponse<T>>, String>
+) -> Result<Option<SearchResponse<T>>, ElasticError>
 where
     T: DeserializeOwned + 'static,
 {
-    let client = el_client();
-    if client.is_err() {
-        return Ok(None);
-    }
-    let client = client.unwrap();
+    let client = el_client()?;
 
     // println!("OK");
     if !query_builder.get_scroll().is_empty() {
@@ -226,7 +283,7 @@ where
                 return match response.json::<SearchResponse<T>>().await {
                     Ok(v) => Ok(Some(v)),
                     Err(v) => {
-                        return Err(v.to_string());
+                        return Err(ElasticError::Response(v.to_string()));
                     }
                 };
             }
@@ -245,7 +302,7 @@ where
             return match response.json::<SearchResponse<T>>().await {
                 Ok(v) => Ok(Some(v)),
                 Err(v) => {
-                    return Err(v.to_string());
+                    return Err(ElasticError::Response(v.to_string()));
                 }
             };
         }
