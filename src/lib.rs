@@ -93,7 +93,7 @@ pub async fn update<T: serde::Serialize>(
     index: &str,
     id: &str,
     source: T,
-) -> Result<bool, ElasticError> {
+) -> Result<(), ElasticError> {
     let client = el_client()?;
     let res = client
         .update(UpdateParts::IndexId(index, id))
@@ -107,14 +107,21 @@ pub async fn update<T: serde::Serialize>(
     if code == 404 {
         return Err(ElasticError::NotFound(format!("not found entity: {}", id)));
     }
-    return Ok(code == 200);
+    let res = res.unwrap();
+    if res.status_code() != 200 {
+        return Err(ElasticError::Response(res.text().await.unwrap_or_default()));
+    }
+    Ok(())
 }
 pub async fn update_or_create<T: serde::Serialize>(
     index: &str,
     id: &str,
     source: &T,
-) -> Result<bool, ElasticError> {
+) -> Result<(), ElasticError> {
     let res = update(index, id, source).await;
+    if res.is_ok() {
+        return Ok(());
+    }
     if res.is_err() {
         let error = res.unwrap_err();
         match error {
@@ -123,18 +130,16 @@ pub async fn update_or_create<T: serde::Serialize>(
                 return Err(error);
             }
         };
-    } else {
-        let res = res.unwrap();
-        if res {
-            return Ok(true);
-        }
     }
     let res = insert_by_id(index, id, source).await;
     if res.is_err() {
         return Err(res.unwrap_err());
     }
     let res = res.unwrap();
-    return Ok(res.status_code() == 200);
+    if res.status_code() != 200 {
+        return Err(ElasticError::Response(res.text().await.unwrap_or_default()));
+    }
+    Ok(())
 }
 
 pub async fn insert_by_id<T: serde::Serialize>(
@@ -200,11 +205,8 @@ pub async fn first_search<T>(
 where
     T: DeserializeOwned + 'static,
 {
-    let client = el_client();
-    if client.is_err() {
-        return Ok(None);
-    }
-    return match client?
+    let client = el_client()?;
+    return match client
         .search(SearchParts::Index(&[index]))
         .body(query_builder.build())
         .size(1)
@@ -267,8 +269,6 @@ where
     T: DeserializeOwned + 'static,
 {
     let client = el_client()?;
-
-    // println!("OK");
     if !query_builder.get_scroll().is_empty() {
         return match client
             .search(SearchParts::Index(&[index]))
@@ -283,7 +283,7 @@ where
                 return match response.json::<SearchResponse<T>>().await {
                     Ok(v) => Ok(Some(v)),
                     Err(v) => {
-                        return Err(ElasticError::Response(v.to_string()));
+                        return Err(ElasticError::JsonParse(v.to_string()));
                     }
                 };
             }
@@ -302,20 +302,10 @@ where
             return match response.json::<SearchResponse<T>>().await {
                 Ok(v) => Ok(Some(v)),
                 Err(v) => {
-                    return Err(ElasticError::Response(v.to_string()));
+                    return Err(ElasticError::JsonParse(v.to_string()));
                 }
             };
         }
         Err(_) => Ok(None),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        // query.add_must("hoge");
-        let result = 2 + 2;
-        assert_eq!(result, 4);
     }
 }

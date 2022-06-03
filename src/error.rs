@@ -4,6 +4,7 @@ use std::fmt::Formatter;
 pub enum ElasticError {
     Connection(String),
     Send(String),
+    JsonParse(String),
     Response(String),
     NotFound(String),
 }
@@ -13,6 +14,7 @@ impl ElasticError {
     fn error(&self) -> Option<String> {
         let value = self.to_owned();
         match value {
+            ElasticError::JsonParse(e) => Some(e.to_string()),
             ElasticError::Response(e) => Some(e.to_string()),
             ElasticError::Connection(e) => Some(e.to_string()),
             ElasticError::Send(e) => Some(e.to_string()),
