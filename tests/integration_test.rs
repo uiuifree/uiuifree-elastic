@@ -1,9 +1,11 @@
+use std::collections::HashMap;
 use uiuifree_elastic::ElasticApi;
 use serde::{Serialize, Deserialize};
 use serde_json::json;
 use elastic_query_builder::query::match_query::MatchQuery;
 use elastic_query_builder::query::wildcard_query::WildcardQuery;
 use elastic_query_builder::QueryBuilder;
+use elasticsearch::http::request::JsonBody;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct TestData {
@@ -20,7 +22,15 @@ pub async fn case01() {
     if ElasticApi::indices().exists(test_index).await.is_ok() {
         assert!(ElasticApi::indices().delete(test_index).await.is_ok(), "削除が失敗しました。")
     }
-    assert!(ElasticApi::indices().create(test_index, json!({})).await.is_ok(), "Index作成");
+    assert!(ElasticApi::indices().create(test_index, json!({
+        "mappings": {
+                    "properties": {
+                      "name": {
+                        "type": "keyword"
+                      },
+                    }
+                  }
+    })).await.is_ok(), "Index作成");
     // refresh
     let refresh = ElasticApi::indices().refresh(test_index).await;
     assert!(refresh.is_ok(), "Index作成 {}", refresh.unwrap_err().to_string());
@@ -61,7 +71,7 @@ pub async fn case01() {
 
     // Search API テストケース
     let mut builder = QueryBuilder::new();
-    builder.set_query(MatchQuery::new("name.keyword", "テストデータ2"));
+    builder.set_query(MatchQuery::new("name", "テストデータ2"));
 
     let res = ElasticApi::search().search::<TestData>(test_index, &builder).await;
     let res = res.unwrap().unwrap().hits.hits.unwrap();
@@ -71,4 +81,19 @@ pub async fn case01() {
         assert_eq!(name , "テストデータ2");
     }
 
+    // Bulk Insert
+    let refresh = ElasticApi::indices().refresh(test_index).await;
+    assert!(refresh.is_ok(), "refresh {}", refresh.unwrap_err().to_string());
+
+    let values = vec![
+        json!({"delete":{"_index":test_index,"_id":test_id}}),
+        json!({"create":{"_index":test_index,"_id":"3"}}),
+        json!({"name":"bulk name3"}),
+        json!({"create":{"_index":test_index,"_id":"4"}}),
+        json!({"name":"bulk name4"}),
+    ];
+    let e = ElasticApi::bulk().bulk(values).await;
+    assert!(e.is_ok(),"{}",e.err().unwrap().to_string());
+    println!("{:?}",e.unwrap());
 }
+

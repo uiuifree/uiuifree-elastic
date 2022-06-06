@@ -11,7 +11,7 @@ use elasticsearch::indices::{IndicesCreateParts, IndicesDeleteParts, IndicesExis
 use elasticsearch::{BulkParts, DeleteParts, Elasticsearch, Error, GetParts, ScrollParts, SearchParts, UpdateParts};
 use serde::de::DeserializeOwned;
 use serde::{Serialize, Deserialize};
-use serde_json::{json};
+use serde_json::{json, Value};
 use std::env;
 
 extern crate serde;
@@ -342,6 +342,24 @@ impl UpdateApi {
 pub struct BulkApi {}
 
 impl BulkApi {
+    pub async fn bulk<T:serde::Serialize>(
+        &self,
+        sources: Vec<T>,
+    ) -> Result<Value, ElasticError>
+    {
+        let mut body: Vec<JsonBody<_>> = Vec::with_capacity(4);
+        for source in sources {
+            body.push(json!(source).into())
+        }
+        let client = el_client()?;
+        parse_response(client.bulk(BulkParts::None).body(body).send().await).await
+        // let res = client.bulk(BulkParts::None).body(body).send().await;
+        // if res.is_err() {
+        //     return Err(ElasticError::Response(res.err().unwrap().to_string()));
+        // }
+        //
+        // return Ok(res.unwrap());
+    }
     pub async fn insert_index<T: serde::Serialize>(
         &self,
         index: &str,
