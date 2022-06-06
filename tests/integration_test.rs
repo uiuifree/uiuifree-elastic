@@ -1,0 +1,74 @@
+use uiuifree_elastic::ElasticApi;
+use serde::{Serialize, Deserialize};
+use serde_json::json;
+use elastic_query_builder::query::match_query::MatchQuery;
+use elastic_query_builder::query::wildcard_query::WildcardQuery;
+use elastic_query_builder::QueryBuilder;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TestData {
+    name: Option<String>,
+}
+
+#[tokio::test]
+pub async fn case01() {
+    let test_index = "test_case";
+    let test_id = "2";
+
+    // INDEX API テストケース
+    assert!(ElasticApi::indices().exists("hoge").await.is_err(), "found hoge");
+    if ElasticApi::indices().exists(test_index).await.is_ok() {
+        assert!(ElasticApi::indices().delete(test_index).await.is_ok(), "削除が失敗しました。")
+    }
+    assert!(ElasticApi::indices().create(test_index, json!({})).await.is_ok(), "Index作成");
+    // refresh
+    let refresh = ElasticApi::indices().refresh(test_index).await;
+    assert!(refresh.is_ok(), "Index作成 {}", refresh.unwrap_err().to_string());
+
+
+    // BulkAPI テストケース
+    let test1 = TestData {
+        name: Some("テストデータ1".to_string())
+    };
+
+    let insert = ElasticApi::bulk().insert_index_by_id(test_index, "1", test1.clone()).await;
+    assert!(insert.is_ok(), "INSERT");
+    let insert = ElasticApi::bulk().insert_index_by_id(test_index, test_id, test1.clone()).await;
+    assert!(insert.is_ok(), "INSERT");
+
+    let test2 = TestData {
+        name: Some("テストデータ2".to_string())
+    };
+    let refresh = ElasticApi::indices().refresh(test_index).await;
+    assert!(refresh.is_ok(), "refresh {}", refresh.unwrap_err().to_string());
+    let insert = ElasticApi::bulk().insert_index_by_id(test_index, test_id, test2.clone()).await;
+    assert!(insert.is_ok(), "INSERT");
+    let refresh = ElasticApi::indices().refresh(test_index).await;
+    assert!(refresh.is_ok(), "Index作成 {}", refresh.unwrap_err().to_string());
+
+
+    // GET API テストケース
+    let get = ElasticApi::get().doc::<TestData>(test_index, test_id).await;
+    assert!(get.is_ok(), "{}", get.unwrap_err().to_string());
+    let get = get.unwrap();
+    assert!(get._source.is_some() && get._source.unwrap().name == test2.name, "name not found ");
+
+    let get = ElasticApi::get().source::<TestData>(test_index, test_id).await;
+    assert!(get.is_ok(), "{}", get.unwrap_err().to_string());
+    let get = get.unwrap();
+    assert_eq!(get.name, test2.name, "name not found ");
+
+
+    // Search API テストケース
+    let mut builder = QueryBuilder::new();
+    builder.set_query(MatchQuery::new("name.keyword", "テストデータ2"));
+
+    let res = ElasticApi::search().search::<TestData>(test_index, &builder).await;
+    let res = res.unwrap().unwrap().hits.hits.unwrap();
+    assert_ne!(0,res.len());
+    for hit in res {
+        let name = hit._source.name.unwrap();
+        assert_eq!(name , "テストデータ2");
+    }
+
+}
