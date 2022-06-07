@@ -1,11 +1,8 @@
-use std::collections::HashMap;
 use uiuifree_elastic::ElasticApi;
 use serde::{Serialize, Deserialize};
 use serde_json::json;
 use elastic_query_builder::query::match_query::MatchQuery;
-use elastic_query_builder::query::wildcard_query::WildcardQuery;
 use elastic_query_builder::QueryBuilder;
-use elasticsearch::http::request::JsonBody;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct TestData {
@@ -75,11 +72,20 @@ pub async fn case01() {
 
     let res = ElasticApi::search().search::<TestData>(test_index, &builder).await;
     let res = res.unwrap().unwrap().hits.hits.unwrap();
-    assert_ne!(0,res.len());
+    assert_ne!(0, res.len());
     for hit in res {
         let name = hit._source.name.unwrap();
-        assert_eq!(name , "テストデータ2");
+        assert_eq!(name, "テストデータ2");
     }
+    // sort
+    let mut builder = QueryBuilder::new();
+    builder.set_sort(vec![
+        json!({"_id":"DESK"})
+    ]);
+
+    let res = ElasticApi::search().search::<TestData>(test_index, &builder).await;
+    let res = res.unwrap().unwrap().hits.hits.unwrap();
+    assert_ne!(0, res.len());
 
     // Bulk Insert
     let refresh = ElasticApi::indices().refresh(test_index).await;
@@ -93,7 +99,7 @@ pub async fn case01() {
         json!({"name":"bulk name4"}),
     ];
     let e = ElasticApi::bulk().bulk(values).await;
-    assert!(e.is_ok(),"{}",e.err().unwrap().to_string());
-    println!("{:?}",e.unwrap());
+    assert!(e.is_ok(), "{}", e.err().unwrap().to_string());
+    println!("{:?}", e.unwrap());
 }
 
