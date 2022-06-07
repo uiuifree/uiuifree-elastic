@@ -40,11 +40,16 @@ async fn parse_response<T: for<'de> serde::Deserialize<'de>>(input: Result<Respo
         let c = input.text().await;
         return Err(ElasticError::Status(status_code, c.unwrap()));
     }
-    let a = input.json().await;
+    let a = input.json::<Value>().await;
     if a.is_err() {
         return Err(ElasticError::JsonParse(a.err().unwrap().to_string()));
     }
-    return Ok(a.unwrap());
+    let v = a.unwrap();
+    let b=  serde_json::from_value(v.clone());
+    if b.is_err(){
+        return Err(ElasticError::JsonParse(v.to_string()));
+    }
+    return Ok(b.unwrap());
 }
 
 
@@ -119,24 +124,15 @@ impl SearchApi {
                 Err(_) => Ok(None),
             };
         }
-        match client
+
+        let res = client
             .search(SearchParts::Index(&[index]))
             .body(query_builder.build())
             .from(query_builder.get_from())
             .size(query_builder.get_size())
             .send()
-            .await
-        {
-            Ok(response) => {
-                return match response.json::<SearchResponse<T>>().await {
-                    Ok(v) => Ok(Some(v)),
-                    Err(v) => {
-                        return Err(ElasticError::JsonParse(v.to_string()));
-                    }
-                };
-            }
-            Err(_) => Ok(None),
-        }
+            .await;
+        parse_response(res).await
     }
     pub async fn scroll<T>(
         &self,
@@ -184,7 +180,12 @@ impl SearchApi {
             Ok(response) => {
                 return match response.json::<SearchResponse<T>>().await {
                     Ok(v) => {
-                        let value = v.hits.hits;
+                        let hits = v.hits;
+                        if hits.is_none(){
+                            return Ok(None);
+                        }
+                        let hits = hits.unwrap();
+                        let value = hits.hits;
                         if value.is_none() {
                             return Ok(None);
                         }
@@ -247,7 +248,6 @@ impl IndicesApi {
         {
             Ok(v) => {
                 let s = v.status_code();
-                println!("{}",v.text().await.unwrap());
                 Ok(s == 200)
             }
             Err(e) => Err(ElasticError::Send(e.to_string())),
@@ -342,7 +342,7 @@ impl UpdateApi {
 pub struct BulkApi {}
 
 impl BulkApi {
-    pub async fn bulk<T:serde::Serialize>(
+    pub async fn bulk<T: serde::Serialize>(
         &self,
         sources: Vec<T>,
     ) -> Result<Value, ElasticError>

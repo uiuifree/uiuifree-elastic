@@ -1,10 +1,10 @@
 use uiuifree_elastic::ElasticApi;
 use serde::{Serialize, Deserialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use elastic_query_builder::query::match_query::MatchQuery;
 use elastic_query_builder::QueryBuilder;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug,Default, Clone, Serialize, Deserialize)]
 struct TestData {
     name: Option<String>,
 }
@@ -71,20 +71,21 @@ pub async fn case01() {
     builder.set_query(MatchQuery::new("name", "テストデータ2"));
 
     let res = ElasticApi::search().search::<TestData>(test_index, &builder).await;
-    let res = res.unwrap().unwrap().hits.hits.unwrap();
+    let res = res.unwrap().unwrap().hits.unwrap().hits.unwrap();
     assert_ne!(0, res.len());
     for hit in res {
-        let name = hit._source.name.unwrap();
+        let name = hit._source.unwrap_or_default().name.unwrap();
         assert_eq!(name, "テストデータ2");
     }
     // sort
     let mut builder = QueryBuilder::new();
-    builder.set_sort(vec![
-        json!({"_id":"DESK"})
-    ]);
+    builder.set_sort(json!([
+        {"name":"desc"}
+    ]));
 
-    let res = ElasticApi::search().search::<TestData>(test_index, &builder).await;
-    let res = res.unwrap().unwrap().hits.hits.unwrap();
+    let res = ElasticApi::search().search::<Value>(test_index, &builder).await;
+    assert!(res.is_ok(),"{:?}",res.err().unwrap());
+    let res = res.unwrap().unwrap().hits.unwrap().hits.unwrap();
     assert_ne!(0, res.len());
 
     // Bulk Insert
@@ -100,6 +101,5 @@ pub async fn case01() {
     ];
     let e = ElasticApi::bulk().bulk(values).await;
     assert!(e.is_ok(), "{}", e.err().unwrap().to_string());
-    println!("{:?}", e.unwrap());
 }
 
