@@ -12,8 +12,8 @@ dotenv = "0.15"
 elasticsearch = "7.14.0-alpha.1"
 elastic-query-builder = { path="../elastic-query-builder" }
 elastic-parser = { path="../elastic-parser" }
-elastic-query-builder ="0.1.6"
-elastic-parser ="0.1.5"
+#elastic-query-builder ="0.1.6"
+#elastic-parser ="0.1.5"
 
 
 serde = "~1"
