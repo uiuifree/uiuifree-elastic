@@ -1,6 +1,6 @@
 use uiuifree_elastic::ElasticApi;
 use serde::{Serialize, Deserialize};
-use serde_json::{json, Value};
+use serde_json::{json};
 use elastic_query_builder::query::match_query::MatchQuery;
 use elastic_query_builder::QueryBuilder;
 
@@ -83,10 +83,15 @@ pub async fn case01() {
         {"name":"desc"}
     ]));
 
-    let res = ElasticApi::search().search::<Value>(test_index, &builder).await;
+    let res = ElasticApi::search().search::<TestData>(test_index, &builder).await;
     assert!(res.is_ok(),"{:?}",res.err().unwrap());
-    let res = res.unwrap().unwrap().hits.unwrap().hits.unwrap();
-    assert_ne!(0, res.len());
+
+    let res = res.unwrap().unwrap();
+    let sources =res.sources();
+    assert_ne!(0, sources.len());
+    for source in sources{
+        assert!( source.name.is_some());
+    }
 
     // Bulk Insert
     let refresh = ElasticApi::indices().refresh(test_index).await;
