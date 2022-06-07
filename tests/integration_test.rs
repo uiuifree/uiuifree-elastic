@@ -87,8 +87,10 @@ pub async fn case01() {
     assert!(res.is_ok(),"{:?}",res.err().unwrap());
 
     let res = res.unwrap().unwrap();
+    let total = res.total_value();
     let sources =res.sources();
     assert_ne!(0, sources.len());
+    assert_eq!(total, sources.len());
     for source in sources{
         assert!( source.name.is_some());
     }
