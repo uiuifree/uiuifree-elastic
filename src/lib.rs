@@ -425,7 +425,7 @@ impl IndexApi {
             return Err(ElasticError::NotFound(format!("not found entity: {}", id)));
         }
         let res = res.unwrap();
-        println!("status: {}",code);
+        // println!("status: {}",code);
         if res.status_code() != 200 && res.status_code() != 201 {
             return Err(ElasticError::Response(res.text().await.unwrap_or_default()));
         }
