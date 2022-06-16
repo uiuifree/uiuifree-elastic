@@ -4,11 +4,12 @@ use serde_json::{json};
 use elastic_query_builder::query::match_query::MatchQuery;
 use elastic_query_builder::QueryBuilder;
 
-#[derive(Debug,Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 struct TestData {
     name: Option<String>,
 }
-#[derive(Debug,Default, Clone, Serialize, Deserialize)]
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 struct TestData2 {
     name: Option<String>,
     created_at: Option<String>,
@@ -19,16 +20,19 @@ pub async fn case03() {
     let test_index = "test_case";
     let test1 = TestData2 {
         name: Some("テストデータ24".to_string()),
-        created_at:None
+        created_at: None,
         // created_at: Some("2020-01-01 00:00:00".to_string()),
     };
-    let res = ElasticApi::index().doc(test_index,"25",&test1.clone()).await;
-    assert!(res.is_ok(),"{}",res.err().unwrap().to_string());
-    let res = ElasticApi::index().doc(test_index,"25",&test1.clone()).await;
-    assert!(res.is_ok(),"{}",res.err().unwrap().to_string());
+    let res = ElasticApi::index().doc(test_index, "25", &test1.clone()).await;
+    assert!(res.is_ok(), "{}", res.err().unwrap().to_string());
+    let test1 = TestData2 {
+        name: Some("テストデータ24".to_string()),
+        created_at: Some("2020-01-01 00:00:00".to_string()),
+    };
 
+    let res = ElasticApi::index().doc(test_index, "25", &test1.clone()).await;
+    assert!(res.is_err(), "{}", res.err().unwrap().to_string());
 }
-
 
 
 #[tokio::test]
@@ -108,15 +112,15 @@ pub async fn case01() {
     ]));
 
     let res = ElasticApi::search().search::<TestData>(test_index, &builder).await;
-    assert!(res.is_ok(),"{:?}",res.err().unwrap());
+    assert!(res.is_ok(), "{:?}", res.err().unwrap());
 
     let res = res.unwrap().unwrap();
     let total = res.total_value();
-    let sources =res.sources();
+    let sources = res.sources();
     assert_ne!(0, sources.len());
     assert_eq!(total, sources.len());
-    for source in sources{
-        assert!( source.name.is_some());
+    for source in sources {
+        assert!(source.name.is_some());
     }
 
     // Bulk Insert
