@@ -8,7 +8,7 @@ use elasticsearch::http::request::JsonBody;
 use elasticsearch::http::response::Response;
 use elasticsearch::http::transport::Transport;
 use elasticsearch::indices::{IndicesCreateParts, IndicesDeleteParts, IndicesExistsParts, IndicesRefreshParts};
-use elasticsearch::{BulkParts, DeleteParts, Elasticsearch, Error, GetParts, ScrollParts, SearchParts, UpdateParts};
+use elasticsearch::{BulkParts, DeleteParts, Elasticsearch, Error, GetParts, IndexParts, ScrollParts, SearchParts, UpdateParts};
 use serde::de::DeserializeOwned;
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
@@ -45,8 +45,8 @@ async fn parse_response<T: for<'de> serde::Deserialize<'de>>(input: Result<Respo
         return Err(ElasticError::JsonParse(a.err().unwrap().to_string()));
     }
     let v = a.unwrap();
-    let b=  serde_json::from_value(v.clone());
-    if b.is_err(){
+    let b = serde_json::from_value(v.clone());
+    if b.is_err() {
         return Err(ElasticError::JsonParse(v.to_string()));
     }
     return Ok(b.unwrap());
@@ -70,6 +70,9 @@ impl ElasticApi {
     }
     pub fn bulk() -> BulkApi {
         BulkApi::default()
+    }
+    pub fn index() -> IndexApi {
+        IndexApi::default()
     }
 }
 
@@ -181,7 +184,7 @@ impl SearchApi {
                 return match response.json::<SearchResponse<T>>().await {
                     Ok(v) => {
                         let hits = v.hits;
-                        if hits.is_none(){
+                        if hits.is_none() {
                             return Ok(None);
                         }
                         let hits = hits.unwrap();
@@ -214,6 +217,8 @@ impl IndicesApi {
             .indices().exists(IndicesExistsParts::Index(&[index]))
             .send()
             .await;
+        // el_client()?.index(IndexParts::IndexId("1","1")).body()
+
         if res.is_err() {
             return Err(ElasticError::Connection(res.unwrap_err().to_string()));
         }
@@ -395,32 +400,35 @@ impl BulkApi {
     }
 }
 
+/// https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-index_.html
+#[derive(Default)]
+pub struct IndexApi {}
 
-pub async fn update_or_create<T: serde::Serialize>(
-    index: &str,
-    id: &str,
-    source: &T,
-) -> Result<(), ElasticError> {
-    let res = ElasticApi::update().doc(index, id, source).await;
-    if res.is_ok() {
-        return Ok(());
+impl IndexApi {
+    pub async fn doc<T: serde::Serialize>(
+        &self,
+        index: &str,
+        id: &str,
+        source: T,
+    ) -> Result<(), ElasticError> {
+        let client = el_client()?;
+        let res = client
+            .index(IndexParts::IndexId(index, id))
+            .body(json!({ "doc": source }))
+            .send()
+            .await;
+        if res.is_err() {
+            return Err(ElasticError::Response(res.unwrap_err().to_string()));
+        }
+        let code = res.as_ref().unwrap().status_code();
+        if code == 404 {
+            return Err(ElasticError::NotFound(format!("not found entity: {}", id)));
+        }
+        let res = res.unwrap();
+        if res.status_code() != 200 && res.status_code() != 201 {
+            return Err(ElasticError::Response(res.text().await.unwrap_or_default()));
+        }
+        Ok(())
     }
-    if res.is_err() {
-        let error = res.unwrap_err();
-        match error {
-            ElasticError::NotFound(_) => {}
-            _ => {
-                return Err(error);
-            }
-        };
-    }
-    let res = ElasticApi::bulk().insert_index_by_id(index, id, source).await;
-    if res.is_err() {
-        return Err(res.unwrap_err());
-    }
-    let res = res.unwrap();
-    if res.status_code() != 200 {
-        return Err(ElasticError::Response(res.text().await.unwrap_or_default()));
-    }
-    Ok(())
 }
+

@@ -1,4 +1,4 @@
-use uiuifree_elastic::ElasticApi;
+use uiuifree_elastic::{ElasticApi};
 use serde::{Serialize, Deserialize};
 use serde_json::{json};
 use elastic_query_builder::query::match_query::MatchQuery;
@@ -8,6 +8,28 @@ use elastic_query_builder::QueryBuilder;
 struct TestData {
     name: Option<String>,
 }
+#[derive(Debug,Default, Clone, Serialize, Deserialize)]
+struct TestData2 {
+    name: Option<String>,
+    created_at: Option<String>,
+}
+
+#[tokio::test]
+pub async fn case03() {
+    let test_index = "test_case";
+    let test1 = TestData2 {
+        name: Some("テストデータ24".to_string()),
+        created_at:None
+        // created_at: Some("2020-01-01 00:00:00".to_string()),
+    };
+    let res = ElasticApi::index().doc(test_index,"25",&test1.clone()).await;
+    assert!(res.is_ok(),"{}",res.err().unwrap().to_string());
+    let res = ElasticApi::index().doc(test_index,"25",&test1.clone()).await;
+    assert!(res.is_ok(),"{}",res.err().unwrap().to_string());
+
+}
+
+
 
 #[tokio::test]
 pub async fn case01() {
@@ -25,13 +47,15 @@ pub async fn case01() {
                       "name": {
                         "type": "keyword"
                       },
+                      "created_at": {
+                        "type": "date"
+                      },
                     }
                   }
     })).await.is_ok(), "Index作成");
     // refresh
     let refresh = ElasticApi::indices().refresh(test_index).await;
     assert!(refresh.is_ok(), "Index作成 {}", refresh.unwrap_err().to_string());
-
 
     // BulkAPI テストケース
     let test1 = TestData {
