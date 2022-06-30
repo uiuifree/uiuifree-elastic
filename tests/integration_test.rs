@@ -3,6 +3,9 @@ use serde::{Serialize, Deserialize};
 use serde_json::{json};
 use elastic_query_builder::query::match_query::MatchQuery;
 use elastic_query_builder::QueryBuilder;
+use serde::de::Unexpected::NewtypeStruct;
+use elastic_query_builder::query::nested::NestedQuery;
+use elastic_query_builder::query::QueryTrait;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 struct TestData {
@@ -32,6 +35,11 @@ pub async fn case03() {
 
     let res = ElasticApi::index().doc(test_index, "25", &test1.clone()).await;
     assert!(res.is_err(), "{}", res.err().unwrap().to_string());
+}
+
+#[tokio::test]
+pub async fn case04() {
+    println!("{}", NestedQuery::new("store", MatchQuery::new("a", "b")).build())
 }
 
 
