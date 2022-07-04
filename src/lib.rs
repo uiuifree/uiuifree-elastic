@@ -8,7 +8,7 @@ use elasticsearch::http::request::JsonBody;
 use elasticsearch::http::response::Response;
 use elasticsearch::http::transport::Transport;
 use elasticsearch::indices::{IndicesCreateParts, IndicesDeleteParts, IndicesExistsParts, IndicesRefreshParts};
-use elasticsearch::{BulkParts, DeleteParts, Elasticsearch, Error, GetParts, IndexParts, ScrollParts, SearchParts, UpdateParts};
+use elasticsearch::{BulkParts, DeleteByQueryParts, DeleteParts, Elasticsearch, Error, GetParts, IndexParts, ScrollParts, SearchParts, UpdateParts};
 use serde::de::DeserializeOwned;
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
@@ -18,6 +18,9 @@ extern crate serde;
 // #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
+
+pub use elastic_parser;
+pub use elastic_query_builder;
 
 pub fn el_client() -> Result<Elasticsearch, ElasticError> {
     dotenv().ok();
@@ -73,6 +76,9 @@ impl ElasticApi {
     }
     pub fn index() -> IndexApi {
         IndexApi::default()
+    }
+    pub fn delete_by_query() -> DeleteByQueryApi {
+        DeleteByQueryApi::default()
     }
 }
 
@@ -346,6 +352,7 @@ impl UpdateApi {
 #[derive(Default)]
 pub struct BulkApi {}
 
+
 impl BulkApi {
     pub async fn bulk<T: serde::Serialize>(
         &self,
@@ -423,6 +430,39 @@ impl IndexApi {
         let code = res.as_ref().unwrap().status_code();
         if code == 404 {
             return Err(ElasticError::NotFound(format!("not found entity: {}", id)));
+        }
+        let res = res.unwrap();
+        // println!("status: {}",code);
+        if res.status_code() != 200 && res.status_code() != 201 {
+            return Err(ElasticError::Response(res.text().await.unwrap_or_default()));
+        }
+        Ok(())
+    }
+}
+
+/// https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-delete-by-query.html
+#[derive(Default)]
+pub struct DeleteByQueryApi {}
+
+impl DeleteByQueryApi {
+    pub async fn index(
+        &self,
+        index: &str,
+        query_builder: &QueryBuilder,
+
+    ) -> Result<(), ElasticError> {
+        let client = el_client()?;
+        let res = client
+            .delete_by_query(DeleteByQueryParts::Index(&[index]))
+            .body(query_builder.build())
+            .send()
+            .await;
+        if res.is_err() {
+            return Err(ElasticError::Response(res.unwrap_err().to_string()));
+        }
+        let code = res.as_ref().unwrap().status_code();
+        if code == 404 {
+            return Err(ElasticError::NotFound(format!("not found index")));
         }
         let res = res.unwrap();
         // println!("status: {}",code);

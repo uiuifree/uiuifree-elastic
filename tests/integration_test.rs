@@ -144,5 +144,12 @@ pub async fn case01() {
     ];
     let e = ElasticApi::bulk().bulk(values).await;
     assert!(e.is_ok(), "{}", e.err().unwrap().to_string());
+
+
+    ElasticApi::indices().refresh(test_index).await;
+    let mut builder = QueryBuilder::new();
+    builder.set_query(MatchQuery::new("_id", "4"));
+    let e = ElasticApi::delete_by_query().index(test_index, &builder).await;
+    assert!(e.is_ok(), "{}", e.err().unwrap().to_string());
 }
 
