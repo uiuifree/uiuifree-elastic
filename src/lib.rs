@@ -8,7 +8,7 @@ use elasticsearch::http::request::JsonBody;
 use elasticsearch::http::response::Response;
 use elasticsearch::http::transport::Transport;
 use elasticsearch::indices::{IndicesCreateParts, IndicesDeleteParts, IndicesExistsParts, IndicesRefreshParts};
-use elasticsearch::{BulkParts, DeleteByQueryParts, DeleteParts, Elasticsearch, Error, GetParts, IndexParts, ScrollParts, SearchParts, UpdateParts};
+use elasticsearch::{BulkParts, DeleteByQueryParts, DeleteParts, Elasticsearch, Error, GetParts, IndexParts, ScrollParts, SearchParts, Update, UpdateParts};
 use serde::de::DeserializeOwned;
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
@@ -79,6 +79,9 @@ impl ElasticApi {
     }
     pub fn delete_by_query() -> DeleteByQueryApi {
         DeleteByQueryApi::default()
+    }
+    pub fn update_by_query() -> UpdateByQuery {
+        UpdateByQuery::default()
     }
 }
 
@@ -439,6 +442,39 @@ impl IndexApi {
         Ok(())
     }
 }
+
+/// https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-update-by-query.html
+#[derive(Default)]
+pub struct UpdateByQuery {}
+
+impl UpdateByQuery {
+    pub async fn index(
+        &self,
+        index: &str,
+        query_builder: &QueryBuilder,
+
+    ) -> Result<(), ElasticError> {
+        let client = el_client()?;
+        let res = client
+            .update_by_query(UpdateByQuery::Index(&[index]))
+            .body(query_builder.build())
+            .send()
+            .await;
+        if res.is_err() {
+            return Err(ElasticError::Response(res.unwrap_err().to_string()));
+        }
+        let code = res.as_ref().unwrap().status_code();
+        if code == 404 {
+            return Err(ElasticError::NotFound(format!("not found entity")));
+        }
+        let res = res.unwrap();
+        if res.status_code() != 200 {
+            return Err(ElasticError::Response(res.text().await.unwrap_or_default()));
+        }
+        Ok(())
+    }
+}
+
 
 /// https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-delete-by-query.html
 #[derive(Default)]
