@@ -8,7 +8,7 @@ use elasticsearch::http::request::JsonBody;
 use elasticsearch::http::response::Response;
 use elasticsearch::http::transport::Transport;
 use elasticsearch::indices::{IndicesCreateParts, IndicesDeleteParts, IndicesExistsParts, IndicesRefreshParts};
-use elasticsearch::{BulkParts, DeleteByQueryParts, DeleteParts, Elasticsearch, Error, GetParts, IndexParts, ScrollParts, SearchParts, Update, UpdateParts};
+use elasticsearch::{BulkParts, DeleteByQueryParts, DeleteParts, Elasticsearch, Error, GetParts, IndexParts, ScrollParts, SearchParts, UpdateByQueryParts, UpdateParts};
 use serde::de::DeserializeOwned;
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
@@ -452,11 +452,10 @@ impl UpdateByQuery {
         &self,
         index: &str,
         query_builder: &QueryBuilder,
-
     ) -> Result<(), ElasticError> {
         let client = el_client()?;
         let res = client
-            .update_by_query(UpdateByQuery::Index(&[index]))
+            .update_by_query(UpdateByQueryParts::Index(&[index]))
             .body(query_builder.build())
             .send()
             .await;
@@ -485,7 +484,6 @@ impl DeleteByQueryApi {
         &self,
         index: &str,
         query_builder: &QueryBuilder,
-
     ) -> Result<(), ElasticError> {
         let client = el_client()?;
         let res = client
