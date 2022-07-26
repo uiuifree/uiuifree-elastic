@@ -1,4 +1,4 @@
-use uiuifree_elastic::{el_client, ElasticApi};
+use uiuifree_elastic::{el_client, el_single_node, ElasticApi};
 use serde_json::{ Value};
 use std::time::{ Instant};
 #[tokio::test]
@@ -19,9 +19,10 @@ pub async fn case02() {
     //     assert!(els.indices().exists(IndicesExistsParts::Index(&["test"])).send().await.is_ok());
     // }
 
-    // let client = el_single_node("http://localhost:9200");
-    let api  = ElasticApi::new(el_client().unwrap());
-    for _ in 1..1000{
+    let a = el_single_node("http://localhost:9200");
+    // let a = el_client().unwrap();
+    for _ in 1..10000{
+        let api  = ElasticApi::new(a.clone());
         assert!(api.indices().exists("test_case").await.is_ok())
     }
 

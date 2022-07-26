@@ -8,12 +8,13 @@ use elasticsearch::http::request::JsonBody;
 use elasticsearch::http::response::Response;
 use elasticsearch::http::transport::{SingleNodeConnectionPool, Transport};
 use elasticsearch::indices::{IndicesCreateParts, IndicesDeleteParts, IndicesExistsParts, IndicesRefreshParts};
-use elasticsearch::{BulkParts, DeleteByQueryParts, DeleteParts, Elasticsearch, Error, GetParts, IndexParts, ScrollParts, SearchParts, UpdateByQueryParts, UpdateParts};
+use elasticsearch::{BulkParts, DeleteByQueryParts, DeleteParts,  Error, GetParts, IndexParts, ScrollParts, SearchParts, UpdateByQueryParts, UpdateParts};
 use serde::de::DeserializeOwned;
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
 use std::env;
 pub use elasticsearch::http::transport::*;
+pub use elasticsearch::Elasticsearch;
 
 extern crate serde;
 // #[macro_use]
