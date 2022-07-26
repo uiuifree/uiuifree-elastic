@@ -1,6 +1,6 @@
 [package]
 name = "uiuifree-elastic"
-version = "0.1.16"
+version = "0.1.20"
 edition = "2021"
 
 authors = ["uiuifree"]
