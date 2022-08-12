@@ -20,10 +20,11 @@ pub async fn case02() {
     // }
 
     let a = el_single_node("http://localhost:9200");
+    let api  = ElasticApi::new(a.clone());
+    let api2  = &api;
     // let a = el_client().unwrap();
     for _ in 1..10000{
-        let api  = ElasticApi::new(a.clone());
-        assert!(api.indices().exists("test_case").await.is_ok())
+        assert!(api2.indices().exists("test_case").await.is_ok())
     }
 
     let end = start.elapsed();
