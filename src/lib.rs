@@ -490,7 +490,7 @@ impl IndexApi<'_> {
 }
 
 impl IndexApi<'_> {
-    pub async fn new<T: serde::Serialize>(
+    pub async fn create<T: serde::Serialize>(
         &self,
         index: &str,
         source: T,
