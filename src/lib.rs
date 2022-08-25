@@ -490,6 +490,31 @@ impl IndexApi<'_> {
 }
 
 impl IndexApi<'_> {
+    pub async fn new<T: serde::Serialize>(
+        &self,
+        index: &str,
+        source: T,
+    ) -> Result<(), ElasticError> {
+
+        let res = self.api.client
+            .index(IndexParts::Index(index))
+            .body(source)
+            .send()
+            .await;
+        if res.is_err() {
+            return Err(ElasticError::Response(res.unwrap_err().to_string()));
+        }
+        let code = res.as_ref().unwrap().status_code();
+        if code == 404 {
+            return Err(ElasticError::NotFound(format!("not found entity")));
+        }
+        let res = res.unwrap();
+        // println!("status: {}",code);
+        if res.status_code() != 200 && res.status_code() != 201 {
+            return Err(ElasticError::Response(res.text().await.unwrap_or_default()));
+        }
+        Ok(())
+    }
     pub async fn doc<T: serde::Serialize>(
         &self,
         index: &str,
