@@ -25,14 +25,14 @@ pub async fn case03() {
         created_at: None,
         // created_at: Some("2020-01-01 00:00:00".to_string()),
     };
-    let res = ElasticApi::new(el_client().unwrap()).index().doc(test_index, "25", &test1.clone()).await;
+    let res = ElasticApi::new(el_client().unwrap()).index().doc(test_index, "25", &test1.clone(),true).await;
     assert!(res.is_ok(), "{}", res.err().unwrap().to_string());
     let test1 = TestData2 {
         name: Some("テストデータ24".to_string()),
         created_at: Some("2020-01-01 00:00:00".to_string()),
     };
 
-    let res = ElasticApi::new(el_client().unwrap()).index().doc(test_index, "25", &test1.clone()).await;
+    let res = ElasticApi::new(el_client().unwrap()).index().doc(test_index, "25", &test1.clone(),true).await;
     assert!(res.is_err(), "{}", res.err().unwrap().to_string());
 }
 
@@ -74,9 +74,9 @@ pub async fn case01() {
     };
     let api = ElasticApi::new(el_client().unwrap());
 
-    let insert = api.bulk().insert_index_by_id(test_index, "1", test1.clone()).await;
+    let insert = api.bulk().insert_index_by_id(test_index, "1", test1.clone(),true).await;
     assert!(insert.is_ok(), "INSERT");
-    let insert = api.bulk().insert_index_by_id(test_index, test_id, test1.clone()).await;
+    let insert = api.bulk().insert_index_by_id(test_index, test_id, test1.clone(),true).await;
     assert!(insert.is_ok(), "INSERT");
 
     let test2 = TestData {
@@ -84,10 +84,10 @@ pub async fn case01() {
     };
     let refresh = api.indices().refresh(test_index).await;
     assert!(refresh.is_ok(), "refresh {}", refresh.unwrap_err().to_string());
-    let insert = api.bulk().insert_index_by_id(test_index, test_id, test2.clone()).await;
+    let insert = api.bulk().insert_index_by_id(test_index, test_id, test2.clone(),true).await;
     assert!(insert.is_ok(), "INSERT");
-    let refresh = api.indices().refresh(test_index).await;
-    assert!(refresh.is_ok(), "Index作成 {}", refresh.unwrap_err().to_string());
+    // let refresh = api.indices().refresh(test_index).await;
+    // assert!(refresh.is_ok(), "Index作成 {}", refresh.unwrap_err().to_string());
 
 
     // GET API テストケース
@@ -142,11 +142,11 @@ pub async fn case01() {
         json!({"create":{"_index":test_index,"_id":"4"}}),
         json!({"name":"bulk name4"}),
     ];
-    let e = api.bulk().bulk(values).await;
+    let e = api.bulk().bulk(values,true).await;
     assert!(e.is_ok(), "{}", e.err().unwrap().to_string());
 
 
-    let _ = api.indices().refresh(test_index).await;
+    // let _ = api.indices().refresh(test_index).await;
     let mut builder = QueryBuilder::new();
     builder.set_query(MatchQuery::new("_id", "4"));
     let e = api.delete_by_query().index(test_index, &builder).await;
