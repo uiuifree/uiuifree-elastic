@@ -617,10 +617,12 @@ impl DeleteByQueryApi<'_> {
         &self,
         index: &str,
         query_builder: &QueryBuilder,
+        refresh:bool
     ) -> Result<(), ElasticError> {
         let res = self.api.client
             .delete_by_query(DeleteByQueryParts::Index(&[index]))
             .body(query_builder.build())
+            .refresh(refresh)
             .send()
             .await;
         if res.is_err() {

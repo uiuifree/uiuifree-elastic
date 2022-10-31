@@ -149,7 +149,7 @@ pub async fn case01() {
     // let _ = api.indices().refresh(test_index).await;
     let mut builder = QueryBuilder::new();
     builder.set_query(MatchQuery::new("_id", "4"));
-    let e = api.delete_by_query().index(test_index, &builder).await;
+    let e = api.delete_by_query().index(test_index, &builder,true).await;
     assert!(e.is_ok(), "{}", e.err().unwrap().to_string());
 }
 
