@@ -9,7 +9,7 @@ license = "MIT"
 
 [dependencies]
 dotenv = "0.15"
-elasticsearch = "7.14.0-alpha.1"
+elasticsearch = "8.5.0-alpha.1"
 #elastic-query-builder = { path="../elastic-query-builder" }
 #elastic-parser = { path="../elastic-parser" }
 elastic-query-builder ="0.1.25"
@@ -17,7 +17,7 @@ elastic-parser ="0.1.8"
 
 serde = "~1"
 serde_json = "~1"
-serde_derive = "1.0"
+serde_derive = "~1"
 
 [dev-dependencies]
 tokio = { version = "1.19.0", features = ["full"] }

@@ -8,7 +8,7 @@ use elasticsearch::http::request::JsonBody;
 use elasticsearch::http::response::Response;
 use elasticsearch::http::transport::{SingleNodeConnectionPool, Transport};
 use elasticsearch::indices::{IndicesCreateParts, IndicesDeleteParts, IndicesExistsParts, IndicesRefreshParts};
-use elasticsearch::{BulkParts, DeleteByQueryParts, DeleteParts, Error, GetParts, IndexParts, ScrollParts, SearchParts, UpdateByQueryParts, UpdateParts};
+use elasticsearch::{BulkParts, DeleteByQueryParts, DeleteParts, Error, GetParts, GetSourceParts, IndexParts, ScrollParts, SearchParts, UpdateByQueryParts, UpdateParts};
 use serde::de::DeserializeOwned;
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
@@ -161,15 +161,15 @@ impl DeleteApi<'_> {
 impl SearchApi<'_> {
     pub async fn search<T>(
         &self,
-        index: &str,
+        index: &[&str],
         query_builder: &QueryBuilder,
     ) -> Result<Option<SearchResponse<T>>, ElasticError>
         where
-            T: DeserializeOwned + 'static,
+            T: DeserializeOwned + 'static + Clone,
     {
         if !query_builder.get_scroll().is_empty() {
             return match self.api.client
-                .search(SearchParts::Index(&[index]))
+                .search(SearchParts::Index(index))
                 .body(query_builder.build())
                 .from(query_builder.get_from())
                 .size(query_builder.get_size())
@@ -190,7 +190,7 @@ impl SearchApi<'_> {
         }
 
         let res = self.api.client
-            .search(SearchParts::Index(&[index]))
+            .search(SearchParts::Index(&index))
             .body(query_builder.build())
             .from(query_builder.get_from())
             .size(query_builder.get_size())
@@ -204,7 +204,7 @@ impl SearchApi<'_> {
         alive: &str,
     ) -> Result<Option<SearchResponse<T>>, ElasticError>
         where
-            T: DeserializeOwned + 'static,
+            T: DeserializeOwned + 'static + Clone,
     {
         match self.api.client
             .scroll(ScrollParts::ScrollId(scroll_id))
@@ -230,7 +230,7 @@ impl SearchApi<'_> {
         query_builder: QueryBuilder,
     ) -> Result<Option<Hit<T>>, ElasticError>
         where
-            T: DeserializeOwned + 'static,
+            T: DeserializeOwned + 'static + Clone,
     {
         return match self.api.client
             .search(SearchParts::Index(&[index]))
@@ -361,14 +361,14 @@ pub struct IndicesRefreshResponse {
 impl GetApi<'_> {
     pub async fn source<T: for<'de> serde::Deserialize<'de>>(&self, index: &str, id: &str) -> Result<T, ElasticError> {
         let res = self.api.client
-            .get(GetParts::IndexTypeId(index, "_source", id))
+            .get_source(GetSourceParts::IndexId(index, id))
             .send()
             .await;
         parse_response(res).await
     }
     pub async fn doc<T: for<'de> serde::Deserialize<'de>>(&self, index: &str, id: &str) -> Result<Doc<T>, ElasticError> {
         let res = self.api.client
-            .get(GetParts::IndexTypeId(index, "_doc", id))
+            .get(GetParts::IndexId(index, id))
             .send()
             .await;
 

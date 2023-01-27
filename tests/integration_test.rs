@@ -1,3 +1,4 @@
+use elastic_query_builder::aggregation::Aggregation;
 use uiuifree_elastic::{el_client, ElasticApi};
 use serde::{Serialize, Deserialize};
 use serde_json::{json};
@@ -5,6 +6,7 @@ use elastic_query_builder::query::match_query::MatchQuery;
 use elastic_query_builder::QueryBuilder;
 use elastic_query_builder::query::nested::NestedQuery;
 use elastic_query_builder::query::QueryTrait;
+use elastic_parser::aggregation::AggregationResponseParser;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 struct TestData {
@@ -106,7 +108,7 @@ pub async fn case01() {
     let mut builder = QueryBuilder::new();
     builder.set_query(MatchQuery::new("name", "テストデータ2"));
 
-    let res = api.search().search::<TestData>(test_index, &builder).await;
+    let res = api.search().search::<TestData>(&[test_index], &builder).await;
     let res = res.unwrap().unwrap().hits.unwrap().hits.unwrap();
     assert_ne!(0, res.len());
     for hit in res {
@@ -119,7 +121,7 @@ pub async fn case01() {
         {"name":"desc"}
     ]));
 
-    let res = api.search().search::<TestData>(test_index, &builder).await;
+    let res = api.search().search::<TestData>(&[test_index], &builder).await;
     assert!(res.is_ok(), "{:?}", res.err().unwrap());
 
     let res = res.unwrap().unwrap();
@@ -151,5 +153,20 @@ pub async fn case01() {
     builder.set_query(MatchQuery::new("_id", "4"));
     let e = api.delete_by_query().index(test_index, &builder,true).await;
     assert!(e.is_ok(), "{}", e.err().unwrap().to_string());
+
+
+    let mut builder = QueryBuilder::new();
+    builder.set_aggregation(vec![
+        Aggregation::terms("name").set_field("name")
+    ]);
+    let res = api.search().search::<TestData>(&[test_index], &builder).await;
+    let res = res.unwrap().unwrap();
+    let agg = res.aggregations().unwrap();
+    let buckets = agg.sub_aggregation("name").unwrap().buckets().unwrap();
+    println!("agg {:?}",buckets);
+    for bucket in buckets{
+        println!("key {:?}",bucket.key());
+        println!("count {:?}",bucket.doc_count());
+    }
 }
 
