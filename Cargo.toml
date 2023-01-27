@@ -13,7 +13,7 @@ elasticsearch = "8.5.0-alpha.1"
 #elastic-query-builder = { path="../elastic-query-builder" }
 #elastic-parser = { path="../elastic-parser" }
 elastic-query-builder ="0.1.25"
-elastic-parser ="0.1.8"
+elastic-parser ="0.1.9"
 
 serde = "~1"
 serde_json = "~1"
