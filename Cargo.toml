@@ -1,6 +1,6 @@
 [package]
 name = "uiuifree-elastic"
-version = "0.2.12"
+version = "0.2.13"
 edition = "2021"
 
 authors = ["uiuifree"]
@@ -13,7 +13,7 @@ elasticsearch = "8.5.0-alpha.1"
 #elastic-query-builder = { path="../elastic-query-builder" }
 #elastic-parser = { path="../elastic-parser" }
 elastic-query-builder ="0.1.30"
-elastic-parser ="0.1.9"
+elastic-parser ="0.1.10"
 
 serde = "~1"
 serde_json = "~1"
