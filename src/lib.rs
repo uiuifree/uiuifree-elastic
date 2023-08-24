@@ -7,7 +7,7 @@ use elastic_query_builder::QueryBuilder;
 use elasticsearch::http::request::JsonBody;
 use elasticsearch::http::response::Response;
 use elasticsearch::http::transport::{SingleNodeConnectionPool, Transport};
-use elasticsearch::indices::{IndicesCreateParts, IndicesDeleteParts, IndicesExistsParts, IndicesGetAlias, IndicesGetAliasParts, IndicesRefreshParts};
+use elasticsearch::indices::{IndicesCreateParts, IndicesDeleteParts, IndicesExistsParts,  IndicesGetAliasParts, IndicesRefreshParts};
 use elasticsearch::{BulkParts, DeleteByQueryParts, DeleteParts, Error, GetParts, GetSourceParts, IndexParts, ScrollParts, SearchParts, UpdateByQueryParts, UpdateParts};
 use serde::de::DeserializeOwned;
 use serde::{Serialize, Deserialize};
@@ -280,16 +280,33 @@ impl IndicesApi<'_> {
 }
 
 impl IndicesApi<'_> {
-    pub async fn get_alias(&self, index: &str) -> Result<Value, ElasticError> {
+    pub async fn get_alias(&self, index: &[&str]) -> Result<Value, ElasticError> {
         let res = self.api.client
-            .indices().get_alias(IndicesGetAliasParts::Index(&[index]))
+            .indices().get_alias(IndicesGetAliasParts::Index(index))
             .send()
             .await;
 
         match res {
             Ok(v) => {
                 if v.status_code() != 200 {
-                    return Err(ElasticError::NotFound(index.to_string()));
+                    return Err(ElasticError::NotFound(index.join(",")));
+                }
+                Ok(v.json().await.unwrap())
+            }
+            Err(err) => { Err(ElasticError::Connection(err.to_string())) }
+        }
+    }
+    pub async fn update_alias(&self, value: Value) -> Result<Value, ElasticError> {
+        let res = self.api.client
+            .indices().update_aliases()
+            .body(value)
+            .send()
+            .await;
+
+        match res {
+            Ok(v) => {
+                if v.status_code() != 200 {
+                    return Err(ElasticError::Status(v.status_code().as_u16(), v.text().await.unwrap_or_default()));
                 }
                 Ok(v.json().await.unwrap())
             }
