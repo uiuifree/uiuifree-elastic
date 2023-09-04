@@ -5,7 +5,7 @@ pub enum ElasticError {
     Connection(String),
     Send(String),
     JsonParse(String),
-    Status(u16,String),
+    Status(u16, String),
     Response(String),
     NotFound(String),
 }
@@ -18,7 +18,7 @@ impl ElasticError {
             ElasticError::JsonParse(e) => Some(e.to_string()),
             ElasticError::Response(e) => Some(e.to_string()),
             ElasticError::Connection(e) => Some(e.to_string()),
-            ElasticError::Status(_,e) => Some(e.to_string()),
+            ElasticError::Status(_, e) => Some(e.to_string()),
             ElasticError::Send(e) => Some(e.to_string()),
             ElasticError::NotFound(e) => Some(e.to_string()),
         }

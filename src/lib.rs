@@ -6,15 +6,21 @@ use elastic_parser::{Doc, Hit, SearchResponse, Shards};
 use elastic_query_builder::QueryBuilder;
 use elasticsearch::http::request::JsonBody;
 use elasticsearch::http::response::Response;
+pub use elasticsearch::http::transport::*;
 use elasticsearch::http::transport::{SingleNodeConnectionPool, Transport};
-use elasticsearch::indices::{IndicesCreateParts, IndicesDeleteParts, IndicesExistsParts,  IndicesGetAliasParts, IndicesRefreshParts};
-use elasticsearch::{BulkParts, DeleteByQueryParts, DeleteParts, Error, GetParts, GetSourceParts, IndexParts, ScrollParts, SearchParts, UpdateByQueryParts, UpdateParts};
+use elasticsearch::indices::{
+    IndicesCreateParts, IndicesDeleteParts, IndicesExistsParts, IndicesGetAliasParts,
+    IndicesRefreshParts,
+};
+pub use elasticsearch::Elasticsearch;
+use elasticsearch::{
+    BulkParts, DeleteByQueryParts, DeleteParts, Error, GetParts, GetSourceParts, IndexParts,
+    ScrollParts, SearchParts, UpdateByQueryParts, UpdateParts,
+};
 use serde::de::DeserializeOwned;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::env;
-pub use elasticsearch::http::transport::*;
-pub use elasticsearch::Elasticsearch;
 
 extern crate serde;
 // #[macro_use]
@@ -50,7 +56,9 @@ fn bool_to_refresh(value: bool) -> Refresh {
     }
 }
 
-async fn parse_response<T: for<'de> serde::Deserialize<'de>>(input: Result<Response, Error>) -> Result<T, ElasticError> {
+async fn parse_response<T: for<'de> serde::Deserialize<'de>>(
+    input: Result<Response, Error>,
+) -> Result<T, ElasticError> {
     if input.is_err() {
         return Err(ElasticError::Send(input.unwrap_err().to_string()));
     }
@@ -72,16 +80,13 @@ async fn parse_response<T: for<'de> serde::Deserialize<'de>>(input: Result<Respo
     return Ok(b.unwrap());
 }
 
-
 pub struct ElasticApi {
     client: Elasticsearch,
 }
 
 impl ElasticApi {
     pub fn new(client: Elasticsearch) -> ElasticApi {
-        ElasticApi {
-            client
-        }
+        ElasticApi { client }
     }
     pub fn get(&self) -> GetApi {
         GetApi::new(&self)
@@ -115,9 +120,7 @@ pub struct SearchApi<'a> {
 
 impl SearchApi<'_> {
     pub fn new(api: &ElasticApi) -> SearchApi {
-        SearchApi {
-            api
-        }
+        SearchApi { api }
     }
 }
 
@@ -127,9 +130,7 @@ pub struct GetApi<'a> {
 
 impl GetApi<'_> {
     pub fn new(api: &ElasticApi) -> GetApi {
-        GetApi {
-            api
-        }
+        GetApi { api }
     }
 }
 
@@ -139,9 +140,7 @@ pub struct DeleteApi<'a> {
 
 impl DeleteApi<'_> {
     pub fn new(api: &ElasticApi) -> DeleteApi {
-        DeleteApi {
-            api
-        }
+        DeleteApi { api }
     }
 }
 
@@ -149,7 +148,12 @@ pub struct DeleteDocResponse {}
 
 impl DeleteApi<'_> {
     pub async fn doc(&self, index: &str, id: &str) -> Result<Response, ElasticError> {
-        let res = self.api.client.delete(DeleteParts::IndexId(index, id)).send().await;
+        let res = self
+            .api
+            .client
+            .delete(DeleteParts::IndexId(index, id))
+            .send()
+            .await;
         if res.is_err() {
             return Err(ElasticError::Response(res.err().unwrap().to_string()));
         }
@@ -157,18 +161,19 @@ impl DeleteApi<'_> {
     }
 }
 
-
 impl SearchApi<'_> {
     pub async fn search<T>(
         &self,
         index: &[&str],
         query_builder: &QueryBuilder,
     ) -> Result<Option<SearchResponse<T>>, ElasticError>
-        where
-            T: DeserializeOwned + 'static + Clone,
+    where
+        T: DeserializeOwned + 'static + Clone,
     {
         if !query_builder.get_scroll().is_empty() {
-            return match self.api.client
+            return match self
+                .api
+                .client
                 .search(SearchParts::Index(index))
                 .body(query_builder.build())
                 .from(query_builder.get_from())
@@ -189,7 +194,9 @@ impl SearchApi<'_> {
             };
         }
 
-        let res = self.api.client
+        let res = self
+            .api
+            .client
             .search(SearchParts::Index(&index))
             .body(query_builder.build())
             .from(query_builder.get_from())
@@ -203,10 +210,12 @@ impl SearchApi<'_> {
         scroll_id: &str,
         alive: &str,
     ) -> Result<Option<SearchResponse<T>>, ElasticError>
-        where
-            T: DeserializeOwned + 'static + Clone,
+    where
+        T: DeserializeOwned + 'static + Clone,
     {
-        match self.api.client
+        match self
+            .api
+            .client
             .scroll(ScrollParts::ScrollId(scroll_id))
             .scroll(alive)
             .send()
@@ -229,10 +238,12 @@ impl SearchApi<'_> {
         index: &str,
         query_builder: QueryBuilder,
     ) -> Result<Option<Hit<T>>, ElasticError>
-        where
-            T: DeserializeOwned + 'static + Clone,
+    where
+        T: DeserializeOwned + 'static + Clone,
     {
-        return match self.api.client
+        return match self
+            .api
+            .client
             .search(SearchParts::Index(&[index]))
             .body(query_builder.build())
             .size(1)
@@ -273,16 +284,17 @@ pub struct IndicesApi<'a> {
 
 impl IndicesApi<'_> {
     pub fn new(api: &ElasticApi) -> IndicesApi {
-        IndicesApi {
-            api
-        }
+        IndicesApi { api }
     }
 }
 
 impl IndicesApi<'_> {
     pub async fn get_alias(&self, index: &[&str]) -> Result<Value, ElasticError> {
-        let res = self.api.client
-            .indices().get_alias(IndicesGetAliasParts::Index(index))
+        let res = self
+            .api
+            .client
+            .indices()
+            .get_alias(IndicesGetAliasParts::Index(index))
             .send()
             .await;
 
@@ -293,12 +305,15 @@ impl IndicesApi<'_> {
                 }
                 Ok(v.json().await.unwrap())
             }
-            Err(err) => { Err(ElasticError::Connection(err.to_string())) }
+            Err(err) => Err(ElasticError::Connection(err.to_string())),
         }
     }
     pub async fn update_alias(&self, value: Value) -> Result<Value, ElasticError> {
-        let res = self.api.client
-            .indices().update_aliases()
+        let res = self
+            .api
+            .client
+            .indices()
+            .update_aliases()
             .body(value)
             .send()
             .await;
@@ -306,16 +321,22 @@ impl IndicesApi<'_> {
         match res {
             Ok(v) => {
                 if v.status_code() != 200 {
-                    return Err(ElasticError::Status(v.status_code().as_u16(), v.text().await.unwrap_or_default()));
+                    return Err(ElasticError::Status(
+                        v.status_code().as_u16(),
+                        v.text().await.unwrap_or_default(),
+                    ));
                 }
                 Ok(v.json().await.unwrap())
             }
-            Err(err) => { Err(ElasticError::Connection(err.to_string())) }
+            Err(err) => Err(ElasticError::Connection(err.to_string())),
         }
     }
     pub async fn exists(&self, index: &str) -> Result<(), ElasticError> {
-        let res = self.api.client
-            .indices().exists(IndicesExistsParts::Index(&[index]))
+        let res = self
+            .api
+            .client
+            .indices()
+            .exists(IndicesExistsParts::Index(&[index]))
             .send()
             .await;
         // el_client()?.index(IndexParts::IndexId("1","1")).body()
@@ -329,7 +350,9 @@ impl IndicesApi<'_> {
         Ok(())
     }
     pub async fn refresh(&self, index: &str) -> Result<IndicesRefreshResponse, ElasticError> {
-        let res = self.api.client
+        let res = self
+            .api
+            .client
             .indices()
             .refresh(IndicesRefreshParts::Index(&[index]))
             .send()
@@ -341,10 +364,12 @@ impl IndicesApi<'_> {
         parse_response(res).await
     }
     pub async fn create<T>(&self, index: &str, json: T) -> Result<bool, ElasticError>
-        where
-            T: Serialize,
+    where
+        T: Serialize,
     {
-        return match self.api.client
+        return match self
+            .api
+            .client
             .indices()
             .create(IndicesCreateParts::Index(index))
             .body(json)
@@ -359,10 +384,10 @@ impl IndicesApi<'_> {
         };
     }
 
-
-    pub async fn delete(&self, index: &str) -> Result<bool, ElasticError>
-    {
-        let res = self.api.client
+    pub async fn delete(&self, index: &str) -> Result<bool, ElasticError> {
+        let res = self
+            .api
+            .client
             .indices()
             .delete(IndicesDeleteParts::Index(&[index]))
             .send()
@@ -375,8 +400,8 @@ impl IndicesApi<'_> {
     }
 
     pub async fn recreate<T>(&self, index: &str, json: T) -> Result<bool, ElasticError>
-        where
-            T: Serialize,
+    where
+        T: Serialize,
     {
         if self.api.indices().exists(index).await.is_ok() {
             let _ = self.api.indices().delete(index).await?;
@@ -390,17 +415,28 @@ pub struct IndicesRefreshResponse {
     pub _shards: Option<Shards>,
 }
 
-
 impl GetApi<'_> {
-    pub async fn source<T: for<'de> serde::Deserialize<'de>>(&self, index: &str, id: &str) -> Result<T, ElasticError> {
-        let res = self.api.client
+    pub async fn source<T: for<'de> serde::Deserialize<'de>>(
+        &self,
+        index: &str,
+        id: &str,
+    ) -> Result<T, ElasticError> {
+        let res = self
+            .api
+            .client
             .get_source(GetSourceParts::IndexId(index, id))
             .send()
             .await;
         parse_response(res).await
     }
-    pub async fn doc<T: for<'de> serde::Deserialize<'de>>(&self, index: &str, id: &str) -> Result<Doc<T>, ElasticError> {
-        let res = self.api.client
+    pub async fn doc<T: for<'de> serde::Deserialize<'de>>(
+        &self,
+        index: &str,
+        id: &str,
+    ) -> Result<Doc<T>, ElasticError> {
+        let res = self
+            .api
+            .client
             .get(GetParts::IndexId(index, id))
             .send()
             .await;
@@ -409,19 +445,15 @@ impl GetApi<'_> {
     }
 }
 
-
 pub struct UpdateApi<'a> {
     api: &'a ElasticApi,
 }
 
 impl UpdateApi<'_> {
     pub fn new(api: &ElasticApi) -> UpdateApi {
-        UpdateApi {
-            api
-        }
+        UpdateApi { api }
     }
 }
-
 
 impl UpdateApi<'_> {
     pub async fn doc<T: serde::Serialize>(
@@ -431,7 +463,9 @@ impl UpdateApi<'_> {
         source: T,
         refresh: bool,
     ) -> Result<(), ElasticError> {
-        let res = self.api.client
+        let res = self
+            .api
+            .client
             .update(UpdateParts::IndexId(index, id))
             .refresh(bool_to_refresh(refresh))
             .body(json!({ "doc": source }))
@@ -452,33 +486,37 @@ impl UpdateApi<'_> {
     }
 }
 
-
 pub struct BulkApi<'a> {
     api: &'a ElasticApi,
 }
 
 impl BulkApi<'_> {
     pub fn new(api: &ElasticApi) -> BulkApi {
-        BulkApi {
-            api
-        }
+        BulkApi { api }
     }
 }
-
 
 impl BulkApi<'_> {
     pub async fn bulk<T: serde::Serialize>(
         &self,
         sources: Vec<T>,
         refresh: bool,
-    ) -> Result<Value, ElasticError>
-    {
+    ) -> Result<Value, ElasticError> {
         let mut body: Vec<JsonBody<_>> = Vec::with_capacity(4);
         for source in sources {
             body.push(json!(source).into())
         }
 
-        parse_response(self.api.client.bulk(BulkParts::None).body(body).refresh(bool_to_refresh(refresh)).send().await).await
+        parse_response(
+            self.api
+                .client
+                .bulk(BulkParts::None)
+                .body(body)
+                .refresh(bool_to_refresh(refresh))
+                .send()
+                .await,
+        )
+        .await
         // let res = client.bulk(BulkParts::None).body(body).send().await;
         // if res.is_err() {
         //     return Err(ElasticError::Response(res.err().unwrap().to_string()));
@@ -496,7 +534,13 @@ impl BulkApi<'_> {
             body.push(json!({"index": {}}).into());
             body.push(json!(source).into())
         }
-        let res = self.api.client.bulk(BulkParts::Index(index)).body(body).send().await;
+        let res = self
+            .api
+            .client
+            .bulk(BulkParts::Index(index))
+            .body(body)
+            .send()
+            .await;
         if res.is_err() {
             return Err(ElasticError::Response(res.err().unwrap().to_string()));
         }
@@ -513,7 +557,14 @@ impl BulkApi<'_> {
         body.push(json!({"index": {"_id":id}}).into());
         body.push(json!(source).into());
 
-        let res = self.api.client.bulk(BulkParts::Index(index)).body(body).refresh(bool_to_refresh(refresh)).send().await;
+        let res = self
+            .api
+            .client
+            .bulk(BulkParts::Index(index))
+            .body(body)
+            .refresh(bool_to_refresh(refresh))
+            .send()
+            .await;
         if res.is_err() {
             return Err(ElasticError::Response(res.err().unwrap().to_string()));
         }
@@ -528,9 +579,7 @@ pub struct IndexApi<'a> {
 
 impl IndexApi<'_> {
     pub fn new(api: &ElasticApi) -> IndexApi {
-        IndexApi {
-            api
-        }
+        IndexApi { api }
     }
 }
 
@@ -541,7 +590,9 @@ impl IndexApi<'_> {
         source: T,
         refresh: bool,
     ) -> Result<(), ElasticError> {
-        let res = self.api.client
+        let res = self
+            .api
+            .client
             .index(IndexParts::Index(index))
             .refresh(bool_to_refresh(refresh))
             .body(source)
@@ -568,7 +619,9 @@ impl IndexApi<'_> {
         source: T,
         refresh: bool,
     ) -> Result<(), ElasticError> {
-        let res = self.api.client
+        let res = self
+            .api
+            .client
             .index(IndexParts::IndexId(index, id))
             .refresh(bool_to_refresh(refresh))
             .body(source)
@@ -597,9 +650,7 @@ pub struct UpdateByQuery<'a> {
 
 impl UpdateByQuery<'_> {
     pub fn new(api: &ElasticApi) -> UpdateByQuery {
-        UpdateByQuery {
-            api
-        }
+        UpdateByQuery { api }
     }
 }
 
@@ -610,7 +661,9 @@ impl UpdateByQuery<'_> {
         query_builder: &QueryBuilder,
         refresh: bool,
     ) -> Result<(), ElasticError> {
-        let res = self.api.client
+        let res = self
+            .api
+            .client
             .update_by_query(UpdateByQueryParts::Index(&[index]))
             .refresh(refresh)
             .body(query_builder.build())
@@ -631,7 +684,6 @@ impl UpdateByQuery<'_> {
     }
 }
 
-
 /// https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-delete-by-query.html
 pub struct DeleteByQueryApi<'a> {
     api: &'a ElasticApi,
@@ -639,9 +691,7 @@ pub struct DeleteByQueryApi<'a> {
 
 impl DeleteByQueryApi<'_> {
     pub fn new(api: &ElasticApi) -> DeleteByQueryApi {
-        DeleteByQueryApi {
-            api
-        }
+        DeleteByQueryApi { api }
     }
 }
 
@@ -652,7 +702,9 @@ impl DeleteByQueryApi<'_> {
         query_builder: &QueryBuilder,
         refresh: bool,
     ) -> Result<(), ElasticError> {
-        let res = self.api.client
+        let res = self
+            .api
+            .client
             .delete_by_query(DeleteByQueryParts::Index(&[index]))
             .body(query_builder.build())
             .refresh(refresh)
@@ -673,4 +725,3 @@ impl DeleteByQueryApi<'_> {
         Ok(())
     }
 }
-

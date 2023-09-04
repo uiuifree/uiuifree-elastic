@@ -1,12 +1,12 @@
+use elastic_parser::aggregation::AggregationResponseParser;
 use elastic_query_builder::aggregation::Aggregation;
-use uiuifree_elastic::{el_client, ElasticApi};
-use serde::{Serialize, Deserialize};
-use serde_json::{json};
 use elastic_query_builder::query::match_query::MatchQuery;
-use elastic_query_builder::QueryBuilder;
 use elastic_query_builder::query::nested::NestedQuery;
 use elastic_query_builder::query::QueryTrait;
-use elastic_parser::aggregation::AggregationResponseParser;
+use elastic_query_builder::QueryBuilder;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use uiuifree_elastic::{el_client, ElasticApi};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 struct TestData {
@@ -27,22 +27,30 @@ pub async fn case03() {
         created_at: None,
         // created_at: Some("2020-01-01 00:00:00".to_string()),
     };
-    let res = ElasticApi::new(el_client().unwrap()).index().doc(test_index, "25", &test1.clone(),true).await;
+    let res = ElasticApi::new(el_client().unwrap())
+        .index()
+        .doc(test_index, "25", &test1.clone(), true)
+        .await;
     assert!(res.is_ok(), "{}", res.err().unwrap().to_string());
     let test1 = TestData2 {
         name: Some("テストデータ24".to_string()),
         created_at: Some("2020-01-01 00:00:00".to_string()),
     };
 
-    let res = ElasticApi::new(el_client().unwrap()).index().doc(test_index, "25", &test1.clone(),true).await;
+    let res = ElasticApi::new(el_client().unwrap())
+        .index()
+        .doc(test_index, "25", &test1.clone(), true)
+        .await;
     assert!(res.is_err(), "{}", res.err().unwrap().to_string());
 }
 
 #[tokio::test]
 pub async fn case04() {
-    println!("{}", NestedQuery::new("store", MatchQuery::new("a", "b")).build())
+    println!(
+        "{}",
+        NestedQuery::new("store", MatchQuery::new("a", "b")).build()
+    )
 }
-
 
 #[tokio::test]
 pub async fn case01() {
@@ -50,65 +58,118 @@ pub async fn case01() {
     let test_id = "2";
 
     // INDEX API テストケース
-    assert!(ElasticApi::new(el_client().unwrap()).indices().exists("hoge").await.is_err(), "found hoge");
-    if ElasticApi::new(el_client().unwrap()).indices().exists(test_index).await.is_ok() {
-        assert!(ElasticApi::new(el_client().unwrap()).indices().delete(test_index).await.is_ok(), "削除が失敗しました。")
+    assert!(
+        ElasticApi::new(el_client().unwrap())
+            .indices()
+            .exists("hoge")
+            .await
+            .is_err(),
+        "found hoge"
+    );
+    if ElasticApi::new(el_client().unwrap())
+        .indices()
+        .exists(test_index)
+        .await
+        .is_ok()
+    {
+        assert!(
+            ElasticApi::new(el_client().unwrap())
+                .indices()
+                .delete(test_index)
+                .await
+                .is_ok(),
+            "削除が失敗しました。"
+        )
     }
-    assert!(ElasticApi::new(el_client().unwrap()).indices().create(test_index, json!({
-        "mappings": {
-                    "properties": {
-                      "name": {
-                        "type": "keyword"
-                      },
-                      "created_at": {
-                        "type": "date"
-                      },
-                    }
-                  }
-    })).await.is_ok(), "Index作成");
+    assert!(
+        ElasticApi::new(el_client().unwrap())
+            .indices()
+            .create(
+                test_index,
+                json!({
+                    "mappings": {
+                                "properties": {
+                                  "name": {
+                                    "type": "keyword"
+                                  },
+                                  "created_at": {
+                                    "type": "date"
+                                  },
+                                }
+                              }
+                })
+            )
+            .await
+            .is_ok(),
+        "Index作成"
+    );
     // refresh
-    let refresh = ElasticApi::new(el_client().unwrap()).indices().refresh(test_index).await;
-    assert!(refresh.is_ok(), "Index作成 {}", refresh.unwrap_err().to_string());
+    let refresh = ElasticApi::new(el_client().unwrap())
+        .indices()
+        .refresh(test_index)
+        .await;
+    assert!(
+        refresh.is_ok(),
+        "Index作成 {}",
+        refresh.unwrap_err().to_string()
+    );
 
     // BulkAPI テストケース
     let test1 = TestData {
-        name: Some("テストデータ1".to_string())
+        name: Some("テストデータ1".to_string()),
     };
     let api = ElasticApi::new(el_client().unwrap());
 
-    let insert = api.bulk().insert_index_by_id(test_index, "1", test1.clone(),true).await;
+    let insert = api
+        .bulk()
+        .insert_index_by_id(test_index, "1", test1.clone(), true)
+        .await;
     assert!(insert.is_ok(), "INSERT");
-    let insert = api.bulk().insert_index_by_id(test_index, test_id, test1.clone(),true).await;
+    let insert = api
+        .bulk()
+        .insert_index_by_id(test_index, test_id, test1.clone(), true)
+        .await;
     assert!(insert.is_ok(), "INSERT");
 
     let test2 = TestData {
-        name: Some("テストデータ2".to_string())
+        name: Some("テストデータ2".to_string()),
     };
     let refresh = api.indices().refresh(test_index).await;
-    assert!(refresh.is_ok(), "refresh {}", refresh.unwrap_err().to_string());
-    let insert = api.bulk().insert_index_by_id(test_index, test_id, test2.clone(),true).await;
+    assert!(
+        refresh.is_ok(),
+        "refresh {}",
+        refresh.unwrap_err().to_string()
+    );
+    let insert = api
+        .bulk()
+        .insert_index_by_id(test_index, test_id, test2.clone(), true)
+        .await;
     assert!(insert.is_ok(), "INSERT");
     // let refresh = api.indices().refresh(test_index).await;
     // assert!(refresh.is_ok(), "Index作成 {}", refresh.unwrap_err().to_string());
-
 
     // GET API テストケース
     let get = api.get().doc::<TestData>(test_index, test_id).await;
     assert!(get.is_ok(), "{}", get.unwrap_err().to_string());
     let get = get.unwrap();
-    assert!(get._source.is_some() && get._source.unwrap().name == test2.name, "name not found ");
+    assert!(
+        get._source.is_some() && get._source.unwrap().name == test2.name,
+        "name not found "
+    );
 
     let get = api.get().source::<TestData>(test_index, test_id).await;
     assert!(get.is_ok(), "{}", get.unwrap_err().to_string());
     let get = get.unwrap();
     assert_eq!(get.name, test2.name, "name not found ");
 
-
     // Search API テストケース
     let mut builder = QueryBuilder::new();
     builder.set_query(MatchQuery::new("name", "テストデータ2"));
 
-    let res = api.search().search::<TestData>(&[test_index], &builder).await;
+    let res = api
+        .search()
+        .search::<TestData>(&[test_index], &builder)
+        .await;
     let res = res.unwrap().unwrap().hits.unwrap().hits.unwrap();
     assert_ne!(0, res.len());
     for hit in res {
@@ -121,7 +182,10 @@ pub async fn case01() {
         {"name":"desc"}
     ]));
 
-    let res = api.search().search::<TestData>(&[test_index], &builder).await;
+    let res = api
+        .search()
+        .search::<TestData>(&[test_index], &builder)
+        .await;
     assert!(res.is_ok(), "{:?}", res.err().unwrap());
 
     let res = res.unwrap().unwrap();
@@ -135,7 +199,11 @@ pub async fn case01() {
 
     // Bulk Insert
     let refresh = api.indices().refresh(test_index).await;
-    assert!(refresh.is_ok(), "refresh {}", refresh.unwrap_err().to_string());
+    assert!(
+        refresh.is_ok(),
+        "refresh {}",
+        refresh.unwrap_err().to_string()
+    );
 
     let values = vec![
         json!({"delete":{"_index":test_index,"_id":test_id}}),
@@ -144,29 +212,30 @@ pub async fn case01() {
         json!({"create":{"_index":test_index,"_id":"4"}}),
         json!({"name":"bulk name4"}),
     ];
-    let e = api.bulk().bulk(values,true).await;
+    let e = api.bulk().bulk(values, true).await;
     assert!(e.is_ok(), "{}", e.err().unwrap().to_string());
-
 
     // let _ = api.indices().refresh(test_index).await;
     let mut builder = QueryBuilder::new();
     builder.set_query(MatchQuery::new("_id", "4"));
-    let e = api.delete_by_query().index(test_index, &builder,true).await;
+    let e = api
+        .delete_by_query()
+        .index(test_index, &builder, true)
+        .await;
     assert!(e.is_ok(), "{}", e.err().unwrap().to_string());
 
-
     let mut builder = QueryBuilder::new();
-    builder.set_aggregation(vec![
-        Aggregation::terms("name").set_field("name")
-    ]);
-    let res = api.search().search::<TestData>(&[test_index], &builder).await;
+    builder.set_aggregation(vec![Aggregation::terms("name").set_field("name")]);
+    let res = api
+        .search()
+        .search::<TestData>(&[test_index], &builder)
+        .await;
     let res = res.unwrap().unwrap();
     let agg = res.aggregations().unwrap();
     let buckets = agg.sub_aggregation("name").unwrap().buckets().unwrap();
-    println!("agg {:?}",buckets);
-    for bucket in buckets{
-        println!("key {:?}",bucket.key());
-        println!("count {:?}",bucket.doc_count());
+    println!("agg {:?}", buckets);
+    for bucket in buckets {
+        println!("key {:?}", bucket.key());
+        println!("count {:?}", bucket.doc_count());
     }
 }
-
