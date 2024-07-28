@@ -730,7 +730,7 @@ impl DeleteByQueryApi<'_> {
 }
 
 /// https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-delete-by-query.html
-pub(super) struct IlmApi<'a> {
+pub struct IlmApi<'a> {
     api: &'a ElasticApi,
 }
 
