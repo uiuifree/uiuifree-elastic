@@ -29,6 +29,7 @@ extern crate serde_json;
 pub use elastic_parser;
 pub use elastic_query_builder;
 pub use elasticsearch::http::Url;
+use elasticsearch::ilm::IlmPutLifecycleParts;
 use elasticsearch::params::Refresh;
 
 pub fn el_client() -> Result<Elasticsearch, ElasticError> {
@@ -515,7 +516,7 @@ impl BulkApi<'_> {
                 .send()
                 .await,
         )
-        .await
+            .await
         // let res = client.bulk(BulkParts::None).body(body).send().await;
         // if res.is_err() {
         //     return Err(ElasticError::Response(res.err().unwrap().to_string()));
@@ -722,5 +723,53 @@ impl DeleteByQueryApi<'_> {
             return Err(ElasticError::Response(res.text().await.unwrap_or_default()));
         }
         Ok(())
+    }
+}
+
+/// https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-delete-by-query.html
+pub struct IlmApi<'a> {
+    api: &'a ElasticApi,
+}
+
+impl IlmApi<'_> {
+    pub fn new(api: &ElasticApi) -> IlmApi {
+        IlmApi { api }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct Acknowledged {
+    acknowledged: bool,
+}
+impl IlmApi<'_> {
+    pub async fn put_lifecycle<T: Serialize>(
+        &self,
+        ilm_name: &str,
+        value: T,
+    ) -> Result<bool, ElasticError>
+    {
+        let res = match self
+            .api
+            .client
+            .ilm()
+            .put_lifecycle(IlmPutLifecycleParts::Policy(ilm_name))
+            .body(value)
+            .send()
+            .await {
+            Ok(v) => v,
+            Err(e) => { return Err(ElasticError::Response(e.to_string())) }
+        };
+
+        let code = res.status_code();
+        if code == 404 {
+            return Err(ElasticError::NotFound("not found ILM".to_string()));
+        }
+        if res.status_code() != 200 && res.status_code() != 201 {
+            return Err(ElasticError::Response(res.text().await.unwrap_or_default()));
+        }
+        match res.json::<Acknowledged>().await {
+            Ok(v) => { Ok(v.acknowledged) }
+            Err(_) => { Ok(false) }
+        }
     }
 }
