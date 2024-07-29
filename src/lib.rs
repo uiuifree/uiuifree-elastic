@@ -8,7 +8,7 @@ use elasticsearch::http::request::JsonBody;
 use elasticsearch::http::response::Response;
 pub use elasticsearch::http::transport::*;
 use elasticsearch::http::transport::{SingleNodeConnectionPool, Transport};
-use elasticsearch::indices::{IndicesCreateParts, IndicesDeleteParts, IndicesExistsAlias, IndicesExistsAliasParts, IndicesExistsParts, IndicesGetAliasParts, IndicesRefreshParts};
+use elasticsearch::indices::{IndicesCreateParts, IndicesDeleteParts, IndicesExistsAlias, IndicesExistsAliasParts, IndicesExistsIndexTemplate, IndicesExistsIndexTemplateParts, IndicesExistsParts, IndicesExistsTemplateParts, IndicesGetAliasParts, IndicesPutIndexTemplateParts, IndicesRefreshParts};
 pub use elasticsearch::Elasticsearch;
 use elasticsearch::{
     BulkParts, DeleteByQueryParts, DeleteParts, Error, GetParts, GetSourceParts, IndexParts,
@@ -392,6 +392,43 @@ impl IndicesApi<'_> {
             .indices()
             .create(IndicesCreateParts::Index(index))
             .body(json)
+            .send()
+            .await
+        {
+            Ok(v) => {
+                let s = v.status_code();
+                Ok(s == 200)
+            }
+            Err(e) => Err(ElasticError::Send(e.to_string())),
+        };
+    }
+    pub async fn put_index_template<T>(&self, index: &str, json: T) -> Result<bool, ElasticError>
+    where
+        T: Serialize,
+    {
+        return match self
+            .api
+            .client
+            .indices()
+            .put_index_template(IndicesPutIndexTemplateParts::Name(index))
+            .body(json)
+            .send()
+            .await
+        {
+            Ok(v) => {
+                let s = v.status_code();
+                Ok(s == 200)
+            }
+            Err(e) => Err(ElasticError::Send(e.to_string())),
+        };
+    }
+    pub async fn exists_index_template<T>(&self, index: &str) -> Result<bool, ElasticError>
+    {
+        return match self
+            .api
+            .client
+            .indices()
+            .exists_index_template(IndicesExistsIndexTemplateParts::Name(index))
             .send()
             .await
         {
