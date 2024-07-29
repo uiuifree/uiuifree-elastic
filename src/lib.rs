@@ -308,7 +308,7 @@ impl IndicesApi<'_> {
             Err(err) => Err(ElasticError::Connection(err.to_string())),
         }
     }
-    pub async fn exist_alias(&self, index: &[&str]) -> Result<Value, ElasticError> {
+    pub async fn exist_alias(&self, index: &[&str]) -> Result<(), ElasticError> {
         let res = self
             .api
             .client
@@ -322,7 +322,7 @@ impl IndicesApi<'_> {
                 if v.status_code() != 200 {
                     return Err(ElasticError::NotFound(index.join(",")));
                 }
-                Ok(v.json().await.unwrap())
+                Ok(())
             }
             Err(err) => Err(ElasticError::Connection(err.to_string())),
         }
