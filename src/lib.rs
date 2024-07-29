@@ -8,10 +8,7 @@ use elasticsearch::http::request::JsonBody;
 use elasticsearch::http::response::Response;
 pub use elasticsearch::http::transport::*;
 use elasticsearch::http::transport::{SingleNodeConnectionPool, Transport};
-use elasticsearch::indices::{
-    IndicesCreateParts, IndicesDeleteParts, IndicesExistsParts, IndicesGetAliasParts,
-    IndicesRefreshParts,
-};
+use elasticsearch::indices::{IndicesCreateParts, IndicesDeleteParts, IndicesExistsAlias, IndicesExistsAliasParts, IndicesExistsParts, IndicesGetAliasParts, IndicesRefreshParts};
 pub use elasticsearch::Elasticsearch;
 use elasticsearch::{
     BulkParts, DeleteByQueryParts, DeleteParts, Error, GetParts, GetSourceParts, IndexParts,
@@ -298,6 +295,25 @@ impl IndicesApi<'_> {
             .client
             .indices()
             .get_alias(IndicesGetAliasParts::Index(index))
+            .send()
+            .await;
+
+        match res {
+            Ok(v) => {
+                if v.status_code() != 200 {
+                    return Err(ElasticError::NotFound(index.join(",")));
+                }
+                Ok(v.json().await.unwrap())
+            }
+            Err(err) => Err(ElasticError::Connection(err.to_string())),
+        }
+    }
+    pub async fn exist_alias(&self, index: &[&str]) -> Result<Value, ElasticError> {
+        let res = self
+            .api
+            .client
+            .indices()
+            .exists_alias(IndicesExistsAliasParts::Name(index))
             .send()
             .await;
 
