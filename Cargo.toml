@@ -1,6 +1,6 @@
 [package]
 name = "uiuifree-elastic"
-version = "0.2.33"
+version = "0.3.0"
 edition = "2021"
 
 authors = ["uiuifree"]
@@ -9,7 +9,7 @@ license = "MIT"
 
 [dependencies]
 dotenv = "0.15"
-elasticsearch = "8.5.0-alpha.1"
+elasticsearch = "8.19.0-alpha.1"
 #elastic-query-builder = { path="../elastic-query-builder" }
 #elastic-parser = { path="../elastic-parser" }
 elastic-query-builder = "0.1.39"
